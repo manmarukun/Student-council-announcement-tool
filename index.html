@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>生徒会運営アプリ</title>
+<script>
+/* html2canvasを動的読み込み。CDN不達でもページの読み込みと基本機能を阻害しない */
+(function(){var s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";s.async=true;
+s.onerror=function(){var w=document.getElementById("cdnWarn");if(w)w.style.display="block";};
+document.head.appendChild(s);})();
+</script>
+<style>
+/* ============ ページUI（Apple HIG風・明るい配色） ============ */
+:root{
+  --bg:#f5f5f7; --card:#ffffff; --line:#e2e2e6; --line2:#d2d2d8;
+  --text:#1d1d1f; --text2:#6e6e73; --text3:#8e8e93;
+  --blue:#0b62c5; --blue-soft:#e8f1fc;
+  --green:#157f3d; --green-soft:#eaf6ee;
+  --red:#c92a2a;  --red-soft:#fdecec;
+  --radius:14px; --radius-lg:20px;
+  --font:"SF Pro Text","SF Pro","Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.6;}
+h1{font-size:22px;margin:0}
+h2{font-size:17px;margin:0 0 12px}
+h3{font-size:15px;margin:0 0 8px}
+header.app{margin:0 auto;max-width:1180px;padding:24px 20px 8px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+header.app p{margin:0;color:var(--text2);font-size:14px}
+main{max-width:1180px;margin:0 auto;padding:12px 20px 80px}
+
+/* タブ・セグメントコントロール */
+.tabs{display:flex;gap:4px;background:#e9e9ed;border-radius:12px;padding:4px;width:100%;max-width:100%;flex-wrap:wrap;margin-bottom:14px;box-sizing:border-box}
+.tabs button{flex:1 1 auto;white-space:nowrap}
+.tabs button{appearance:none;border:0;background:transparent;font:inherit;font-weight:600;font-size:15px;color:var(--text);padding:10px 18px;border-radius:9px;cursor:pointer;min-height:44px}
+.tabs button[aria-pressed="true"]{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.tabs button:focus-visible,.seg button:focus-visible,.ratio button:focus-visible,.btn:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid rgba(11,98,197,.45);outline-offset:2px}
+
+.layout{display:grid;grid-template-columns:400px minmax(0,1fr);gap:20px;align-items:start}
+.layout>section{min-width:0}
+@media(max-width:960px){.layout{grid-template-columns:minmax(0,1fr)}}
+
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:18px 18px 22px;margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px}
+.field input[type=text],.field input[type=url],.field input[type=number],.field textarea,.field select{
+  width:100%;font:inherit;font-size:16px;color:var(--text);background:#fff;border:1px solid var(--line2);border-radius:10px;padding:10px 12px;min-height:44px}
+.field textarea{min-height:76px;resize:vertical;line-height:1.6}
+.field .hint{font-size:12px;color:var(--text3);margin-top:4px;line-height:1.5}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+/* 委員会カラー選択 */
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chips label{display:flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:999px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px;background:#fff}
+.chips input{accent-color:var(--blue);width:18px;height:18px}
+.chips .dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+
+/* 議案行 */
+.agenda-row{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;background:#fcfcfd}
+.agenda-row .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.agenda-row .top strong{font-size:13px;color:var(--text2)}
+.icon-btn{appearance:none;border:1px solid var(--line2);background:#fff;border-radius:8px;width:44px;height:44px;font-size:18px;cursor:pointer;color:var(--red)}
+.btn{appearance:none;border:0;font:inherit;font-weight:600;font-size:15px;border-radius:12px;padding:12px 20px;min-height:44px;cursor:pointer}
+.btn.primary{background:var(--blue);color:#fff}
+.btn.ghost{background:#e9e9ed;color:var(--text)}
+.btn.block{width:100%}
+.note{font-size:13px;color:var(--text2);background:#f5f5f7;border:1px solid var(--line);border-radius:10px;padding:10px 12px;line-height:1.6;margin-top:12px}
+.note b{color:var(--text)}
+.status{font-size:12px;color:var(--text3);min-height:1.4em;margin-top:8px}
+
+/* 出力比率セグメント */
+.ratio{display:flex;gap:4px;background:#e9e9ed;border-radius:12px;padding:4px;width:100%;max-width:100%;margin-bottom:6px;box-sizing:border-box}
+.ratio button{flex:1 1 0;min-width:0;font-size:13.5px;padding:9px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ratio button{appearance:none;border:0;background:transparent;font:inherit;font-weight:600;font-size:14px;color:var(--text);padding:9px 16px;border-radius:9px;cursor:pointer;min-height:44px}
+.ratio button[aria-pressed="true"]{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.stage-wrap{position:relative;background:#eaeaef;border:1px solid var(--line);border-radius:var(--radius-lg);overflow:hidden;display:block;min-height:0;margin:0 auto}
+/* 拡大縮小は transform のみで行い、Flex/Gridによるバナー内部の再配置を防ぐ */
+#bannerStage{position:absolute;left:0;top:0;flex:none;}
+
+/* ============ バナー共通（html2canvas向け：var/gap/transform不使用・固定値のみ） ============ */
+.banner{font-family:"SF Pro Display","SF Pro","Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,-apple-system,sans-serif;background:#ffffff;color:#1d1d1f;display:flex;flex-direction:column;transform-origin:top left}
+.banner.r169{width:1280px;height:720px;padding:52px 56px}
+.banner.r11{width:900px;height:900px;padding:56px 60px}
+.banner.r916{width:540px;height:960px;padding:42px 40px}
+.b-top{display:flex;align-items:center}
+.b-pill{display:inline-flex;align-items:center;border-radius:999px;font-weight:700}
+.b-pill .dot{border-radius:50%;display:inline-block}
+.b-title{font-weight:800;letter-spacing:.02em;line-height:1.25}
+.b-sub{font-weight:600;color:#6e6e73}
+.b-card{background:#f5f5f7;border:1px solid #e2e2e6;border-radius:20px}
+.b-label{display:flex;align-items:center;font-weight:700;color:#6e6e73;letter-spacing:.08em}
+.b-big{font-weight:800;line-height:1;letter-spacing:-.02em}
+.b-mid{font-weight:700}
+.b-small{color:#6e6e73;font-weight:600}
+.b-icon{width:1em;height:1em;display:inline-block;vertical-align:-.12em}
+/* カード間の余白は margin で確保（gapは使用しない） */
+.b-row{display:flex}
+.b-col{display:flex;flex-direction:column}
+.b-card{margin-bottom:16px}
+.b-card:last-child{margin-bottom:0}
+
+/* --- 告知バナー --- */
+.notice169 .b-top{margin-bottom:28px}
+.notice169 .b-pill{padding:8px 18px;font-size:20px}
+.notice169 .b-pill .dot{width:12px;height:12px;margin-right:9px}
+.notice169 .b-title{font-size:46px;margin-left:22px}
+.notice169 .b-body{display:flex}
+.notice169 .b-date{width:340px;margin-right:36px}
+.notice169 .b-date .b-mon{font-size:30px;font-weight:800}
+.notice169 .b-date .b-big{font-size:170px;margin:4px 0 10px}
+.notice169 .b-date .b-wd{font-size:34px;font-weight:700;margin-bottom:8px}
+.notice169 .b-date .b-time{font-size:40px;font-weight:800}
+.notice169 .b-main{flex:1}
+.notice169 .b-card{padding:22px 26px}
+.notice169 .b-label{font-size:16px;margin-bottom:10px}
+.notice169 .b-place{font-size:34px;font-weight:800}
+.notice169 .b-agenda{font-size:27px;font-weight:700;line-height:1.55;white-space:pre-line}
+.notice169 .b-note{font-size:21px;font-weight:600;color:#6e6e73;line-height:1.6;white-space:pre-line;overflow-wrap:anywhere}
+.notice11 .b-top{margin-bottom:24px;justify-content:center}
+.notice11 .b-pill{padding:9px 20px;font-size:22px}
+.notice11 .b-pill .dot{width:13px;height:13px;margin-right:10px}
+.notice11 .b-titleblock{text-align:center;margin-bottom:18px}
+.notice11 .b-title{font-size:48px}
+.notice11 .b-sub{font-size:22px;margin-top:6px}
+.notice11 .b-date{text-align:center;margin-bottom:30px}
+.notice11 .b-date .b-mon{font-size:34px;font-weight:800}
+.notice11 .b-date .b-big{font-size:190px;margin:8px 0 12px}
+.notice11 .b-date .b-wd{font-size:36px;font-weight:700}
+.notice11 .b-date .b-time{font-size:38px;font-weight:800;margin-left:14px}
+.notice11 .b-card{padding:24px 28px;margin-bottom:18px}
+.notice11 .b-label{font-size:17px;margin-bottom:10px}
+.notice11 .b-place{font-size:34px;font-weight:800}
+.notice11 .b-agenda{font-size:26px;font-weight:700;line-height:1.6;white-space:pre-line}
+.notice11 .b-note{font-size:20px;font-weight:600;color:#6e6e73;line-height:1.6;white-space:pre-line;overflow-wrap:anywhere}
+.notice916 .b-top{margin-bottom:18px}
+.notice916 .b-pill{padding:7px 16px;font-size:18px}
+.notice916 .b-pill .dot{width:11px;height:11px;margin-right:8px}
+.notice916 .b-title{font-size:34px;margin-left:16px}
+.notice916 .b-date{margin-bottom:18px}
+.notice916 .b-date .b-mon{font-size:24px;font-weight:800}
+.notice916 .b-date .b-big{font-size:120px;margin:2px 0 8px}
+.notice916 .b-date .b-wd{font-size:26px;font-weight:700;margin-bottom:6px}
+.notice916 .b-date .b-time{font-size:30px;font-weight:800}
+.notice916 .b-card{padding:18px 20px;margin-bottom:14px}
+.notice916 .b-label{font-size:14px;margin-bottom:8px}
+.notice916 .b-place{font-size:27px;font-weight:800}
+.notice916 .b-agenda{font-size:21px;font-weight:700;line-height:1.55;white-space:pre-line}
+.notice916 .b-note{font-size:16px;font-weight:600;color:#6e6e73;line-height:1.6;white-space:pre-line;overflow-wrap:anywhere}
+
+/* --- 採決バナー --- */
+.vote169 .b-top{margin-bottom:24px;align-items:flex-end}
+.vote169 .b-pill{padding:8px 18px;font-size:20px}
+.vote169 .b-pill .dot{width:12px;height:12px;margin-right:9px}
+.vote169 .b-titleblock{margin-left:22px;flex:1}
+.vote169 .b-title{font-size:42px}
+.vote169 .b-meet{font-size:22px;color:#6e6e73;font-weight:600;margin-top:4px}
+.vote169 .b-datebox{text-align:right}
+.vote169 .b-datebox .b-big{font-size:64px}
+.vote169 .b-datebox .b-rest{font-size:24px;font-weight:700;color:#6e6e73}
+.vote169 .b-grid{display:flex;flex-wrap:wrap}
+.vote169 .b-vcard{background:#f5f5f7;border:1px solid #e2e2e6;border-radius:18px;padding:20px 22px;width:31.5%;margin-right:2.75%;margin-bottom:18px}
+.vote169 .b-vcard:nth-child(3n){margin-right:0}
+.vote169 .b-vname{font-size:23px;font-weight:800;line-height:1.35;margin-bottom:14px;overflow-wrap:anywhere}
+.vote169 .b-votes{display:flex}
+.vote169 .b-votes .v{flex:1;text-align:center;background:#ffffff;border:1px solid #e2e2e6;border-radius:12px;padding:8px 2px;margin-right:6px}
+.vote169 .b-votes .v:last-child{margin-right:0}
+.vote169 .b-votes .vl{display:block;font-size:13px;font-weight:700;color:#6e6e73}
+.vote169 .b-votes .vn{display:block;font-size:30px;font-weight:800;margin-top:2px}
+.vote169 .b-badge{display:inline-block;margin-top:12px;font-size:17px;font-weight:800;padding:5px 16px;border-radius:999px}
+.badge-pass{background:#e7f6ec;color:#0d5c2c;border:1px solid #bfe4cc}
+.badge-rej{background:#fdecec;color:#a11f1f;border:1px solid #f2c4c4}
+.badge-cont{background:#fdf3e2;color:#92580a;border:1px solid #f0dcb2}
+.vote169 .b-vcard.dense{padding:14px 16px;margin-bottom:14px}
+.vote169 .b-vcard.dense .b-vname{font-size:19px;margin-bottom:10px}
+.vote169 .b-vcard.dense .b-votes .vn{font-size:24px}
+.vote169 .b-vcard.xdense{padding:12px 14px;margin-bottom:12px}
+.vote169 .b-vcard.xdense .b-vname{font-size:17px;margin-bottom:8px}
+.vote169 .b-vcard.xdense .b-votes .vn{font-size:21px}
+.vote169 .b-vcard.xdense .b-votes .vl{font-size:11px}
+.vote169 .b-vcard.xdense .b-badge{font-size:14px;margin-top:8px}
+.vote169 .b-summary{margin-top:2px;font-size:20px;font-weight:700;color:#3a3a3c}
+
+.vote11 .b-top{margin-bottom:22px;flex-direction:column;align-items:center;text-align:center}
+.vote11 .b-pill{padding:9px 20px;font-size:22px}
+.vote11 .b-pill .dot{width:13px;height:13px;margin-right:10px}
+.vote11 .b-title{font-size:44px;margin-top:14px}
+.vote11 .b-meet{font-size:22px;font-weight:600;color:#6e6e73;margin-top:4px}
+.vote11 .b-datebox{margin-top:10px}
+.vote11 .b-datebox .b-big{font-size:56px}
+.vote11 .b-datebox .b-rest{font-size:22px;font-weight:700;color:#6e6e73;margin-left:8px}
+.vote11 .b-grid{display:flex;flex-wrap:wrap}
+.vote11 .b-vcard{background:#f5f5f7;border:1px solid #e2e2e6;border-radius:18px;padding:18px 20px;width:48.5%;margin-right:3%;margin-bottom:16px}
+.vote11 .b-vcard:nth-child(2n){margin-right:0}
+.vote11 .b-vname{font-size:22px;font-weight:800;line-height:1.35;margin-bottom:12px;overflow-wrap:anywhere}
+.vote11 .b-votes{display:flex}
+.vote11 .b-votes .v{flex:1;text-align:center;background:#ffffff;border:1px solid #e2e2e6;border-radius:12px;padding:8px 2px;margin-right:6px}
+.vote11 .b-votes .v:last-child{margin-right:0}
+.vote11 .b-votes .vl{display:block;font-size:12px;font-weight:700;color:#6e6e73}
+.vote11 .b-votes .vn{display:block;font-size:32px;font-weight:800;margin-top:2px}
+.vote11 .b-badge{display:inline-block;margin-top:10px;font-size:16px;font-weight:800;padding:5px 16px;border-radius:999px}
+.vote11 .b-vcard.dense{width:100%;margin-right:0}
+.vote11 .b-vcard.dense .b-votes .vn{font-size:26px}
+.vote11 .b-vcard.xdense{padding:14px 16px;margin-bottom:12px}
+.vote11 .b-vcard.xdense .b-vname{font-size:18px;margin-bottom:8px}
+.vote11 .b-vcard.xdense .b-votes .vn{font-size:22px}
+.vote11 .b-vcard.xdense .b-badge{font-size:14px;margin-top:8px}
+.vote11 .b-summary{margin-top:4px;font-size:20px;font-weight:700;color:#3a3a3c;text-align:center}
+
+.vote916 .b-top{margin-bottom:16px;flex-direction:column;align-items:center;text-align:center}
+.vote916 .b-pill{padding:7px 16px;font-size:18px}
+.vote916 .b-pill .dot{width:11px;height:11px;margin-right:8px}
+.vote916 .b-title{font-size:32px;margin-top:10px}
+.vote916 .b-meet{font-size:17px;font-weight:600;color:#6e6e73;margin-top:2px}
+.vote916 .b-datebox{margin-top:8px}
+.vote916 .b-datebox .b-big{font-size:44px}
+.vote916 .b-datebox .b-rest{font-size:18px;font-weight:700;color:#6e6e73;margin-left:6px}
+.vote916 .b-grid{display:flex;flex-direction:column}
+.vote916 .b-vcard{background:#f5f5f7;border:1px solid #e2e2e6;border-radius:16px;padding:14px 16px;margin-bottom:12px}
+.vote916 .b-vname{font-size:18px;font-weight:800;line-height:1.35;margin-bottom:10px;overflow-wrap:anywhere}
+.vote916 .b-votes{display:flex}
+.vote916 .b-votes .v{flex:1;text-align:center;background:#ffffff;border:1px solid #e2e2e6;border-radius:10px;padding:6px 2px;margin-right:5px}
+.vote916 .b-votes .v:last-child{margin-right:0}
+.vote916 .b-votes .vl{display:block;font-size:11px;font-weight:700;color:#6e6e73}
+.vote916 .b-votes .vn{display:block;font-size:22px;font-weight:800;margin-top:1px}
+.vote916 .b-badge{display:inline-block;margin-top:8px;font-size:13px;font-weight:800;padding:4px 12px;border-radius:999px}
+.vote916 .b-vcard.dense{padding:10px 12px;margin-bottom:10px}
+.vote916 .b-vcard.dense .b-vname{font-size:15px;margin-bottom:7px}
+.vote916 .b-vcard.dense .b-votes .vn{font-size:17px}
+.vote916 .b-vcard.xdense{padding:8px 10px;margin-bottom:8px}
+.vote916 .b-vcard.xdense .b-vname{font-size:13px;margin-bottom:5px}
+.vote916 .b-vcard.xdense .b-votes .vn{font-size:14px}
+.vote916 .b-vcard.xdense .b-votes .vl{font-size:9px}
+.vote916 .b-vcard.xdense .b-badge{font-size:11px;margin-top:5px;padding:3px 10px}
+.vote916 .b-summary{margin-top:2px;font-size:15px;font-weight:700;color:#3a3a3c;text-align:center}
+
+/* --- 行事検討委員会バナー --- */
+.event169 .b-top{margin-bottom:26px}
+.event169 .b-pill{padding:8px 18px;font-size:20px}
+.event169 .b-pill .dot{width:12px;height:12px;margin-right:9px}
+.event169 .b-title{font-size:44px;margin-left:22px}
+.event169 .b-mode{margin-left:auto;font-size:18px;font-weight:800;padding:6px 18px;border-radius:999px;border:1.5px solid #f0b9b9;color:#c92a2a;background:#fdecec}
+.event169 .b-body{display:flex}
+.event169 .b-date{width:320px;margin-right:36px}
+.event169 .b-date .b-mon{font-size:28px;font-weight:800}
+.event169 .b-date .b-big{font-size:150px;margin:4px 0 10px}
+.event169 .b-date .b-wd{font-size:30px;font-weight:700;margin-bottom:8px}
+.event169 .b-date .b-time{font-size:36px;font-weight:800}
+.event169 .b-main{flex:1}
+.event169 .b-card{padding:20px 26px}
+.event169 .b-label{font-size:15px;margin-bottom:8px}
+.event169 .b-place{font-size:30px;font-weight:800}
+.event169 .b-agenda{font-size:25px;font-weight:700;line-height:1.55;white-space:pre-line}
+.event169 .b-note{font-size:19px;font-weight:600;color:#6e6e73;line-height:1.6;white-space:pre-line;overflow-wrap:anywhere}
+.event169 .b-kai{font-size:24px;font-weight:800}
+.event169 .b-urlbox{font-size:17px;font-weight:600;color:#0b62c5;background:#ffffff;border:1px dashed #b9cde8;border-radius:10px;padding:10px 14px;overflow-wrap:anywhere;line-height:1.5}
+.event11 .b-top{margin-bottom:22px;justify-content:center;flex-wrap:wrap}
+.event11 .b-pill{padding:9px 20px;font-size:22px}
+.event11 .b-pill .dot{width:13px;height:13px;margin-right:10px}
+.event11 .b-mode{margin-left:14px;font-size:18px;font-weight:800;padding:7px 18px;border-radius:999px;border:1.5px solid #f0b9b9;color:#c92a2a;background:#fdecec}
+.event11 .b-date{text-align:center;margin-bottom:26px}
+.event11 .b-date .b-mon{font-size:32px;font-weight:800}
+.event11 .b-date .b-big{font-size:170px;margin:6px 0 10px}
+.event11 .b-date .b-wd{font-size:32px;font-weight:700}
+.event11 .b-date .b-time{font-size:34px;font-weight:800;margin-left:12px}
+.event11 .b-card{padding:22px 26px;margin-bottom:16px}
+.event11 .b-label{font-size:16px;margin-bottom:8px}
+.event11 .b-place{font-size:32px;font-weight:800}
+.event11 .b-agenda{font-size:25px;font-weight:700;line-height:1.6;white-space:pre-line}
+.event11 .b-note{font-size:19px;font-weight:600;color:#6e6e73;line-height:1.6;white-space:pre-line;overflow-wrap:anywhere}
+.event11 .b-kai{font-size:24px;font-weight:800;text-align:center}
+.event11 .b-urlbox{font-size:16px;font-weight:600;color:#0b62c5;background:#ffffff;border:1px dashed #b9cde8;border-radius:10px;padding:10px 14px;overflow-wrap:anywhere;line-height:1.5}
+.event916 .b-top{margin-bottom:16px}
+.event916 .b-pill{padding:7px 16px;font-size:18px}
+.event916 .b-pill .dot{width:11px;height:11px;margin-right:8px}
+.event916 .b-title{font-size:32px;margin-left:14px}
+.event916 .b-mode{margin-left:auto;font-size:14px;font-weight:800;padding:4px 12px;border-radius:999px;border:1.5px solid #f0b9b9;color:#c92a2a;background:#fdecec}
+.event916 .b-date{margin-bottom:16px}
+.event916 .b-date .b-mon{font-size:22px;font-weight:800}
+.event916 .b-date .b-big{font-size:110px;margin:2px 0 6px}
+.event916 .b-date .b-wd{font-size:24px;font-weight:700;margin-bottom:4px}
+.event916 .b-date .b-time{font-size:28px;font-weight:800}
+.event916 .b-card{padding:16px 18px;margin-bottom:12px}
+.event916 .b-label{font-size:13px;margin-bottom:6px}
+.event916 .b-place{font-size:24px;font-weight:800}
+.event916 .b-agenda{font-size:19px;font-weight:700;line-height:1.55;white-space:pre-line}
+.event916 .b-note{font-size:15px;font-weight:600;color:#6e6e73;line-height:1.6;white-space:pre-line;overflow-wrap:anywhere}
+.event916 .b-kai{font-size:19px;font-weight:800}
+.event916 .b-urlbox{font-size:13px;font-weight:600;color:#0b62c5;background:#ffffff;border:1px dashed #b9cde8;border-radius:10px;padding:8px 10px;overflow-wrap:anywhere;line-height:1.5}
+
+/* 出力用隔離ステージ */
+#exportStage{position:fixed;left:-20000px;top:0;pointer-events:none}
+
+/* モーダル */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+.modal.open{display:flex}
+.modal-card{background:#fff;border-radius:20px;max-width:min(920px,96vw);max-height:92vh;overflow:auto;padding:20px}
+.modal-card img{max-width:100%;height:auto;display:block;border-radius:12px;border:1px solid var(--line)}
+.modal-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.modal-actions .btn{flex:1;min-width:160px}
+
+#cdnWarn{display:none;background:#fdf3e2;border:1px solid #f0dcb2;color:#92580a;border-radius:12px;padding:12px 16px;font-size:14px;margin-bottom:14px;line-height:1.6}
+footer{max-width:1180px;margin:0 auto;padding:0 20px 40px;color:var(--text3);font-size:12px;line-height:1.7}
+@media(max-width:520px){.grid3{grid-template-columns:1fr 1fr}}
+@media(prefers-reduced-motion:reduce){*{transition:none}}
+@media(forced-colors:active){.tabs button[aria-pressed="true"],.ratio button[aria-pressed="true"]{outline:2px solid CanvasText}}
+</style>
+</head>
+<body>
+<header class="app">
+  <h1>生徒会運営アプリ</h1>
+  <p>会議告知・採決結果・行事検討のバナーを作成し、PNG画像として保存できます。入力は自動で保存されます。</p>
+</header>
+<main>
+  <div id="cdnWarn" role="alert">PNG出力用ライブラリ（html2canvas）を読み込めませんでした。ネットワーク接続を確認してください。この状態では編集・プレビュー・自動保存はご利用いただけますが、PNG保存のみできません。</div>
+
+  <nav class="tabs" aria-label="バナーの種類">
+    <button type="button" data-tab="notice" aria-pressed="true">開催告知</button>
+    <button type="button" data-tab="vote" aria-pressed="false">採決結果</button>
+    <button type="button" data-tab="event" aria-pressed="false">行事検討委員会</button>
+  </nav>
+
+  <div class="layout">
+    <section aria-label="入力フォーム">
+      <!-- 開催告知 -->
+      <div class="panel" id="panel-notice">
+        <h2>開催告知バナー</h2>
+        <div class="field"><label for="n-committee">委員会名</label><input type="text" id="n-committee" value="全校委員会"></div>
+        <div class="chips" role="radiogroup" aria-label="委員会の色テーマ">
+          <label><input type="radio" name="n-theme" value="green" checked><span class="dot" style="background:#157f3d"></span>全校（緑）</label>
+          <label><input type="radio" name="n-theme" value="blue"><span class="dot" style="background:#0b62c5"></span>代表（青）</label>
+          <label><input type="radio" name="n-theme" value="red"><span class="dot" style="background:#c92a2a"></span>行事（赤）</label>
+        </div>
+        <div class="field" style="margin-top:14px"><label for="n-title">タイトル</label><input type="text" id="n-title" value="第1回 全校委員会"></div>
+        <div class="grid2">
+          <div class="field"><label for="n-date">開催日</label><input type="text" id="n-date" value="10月15日（木）" placeholder="例：10月15日（木） または 2026/10/15">
+            <div class="hint">「10月15日（木）」「2026/10/15」など。判別できる場合は日の数字だけ大きく表示します。</div></div>
+          <div class="field"><label for="n-time">時刻</label><input type="text" id="n-time" value="16:00" placeholder="例：16:00"></div>
+        </div>
+        <div class="field"><label for="n-place">場所</label><input type="text" id="n-place" value="視聴覚室"></div>
+        <div class="field"><label for="n-agenda">議題</label><textarea id="n-agenda">・学生会館利用について
+・文化祭の準備状況</textarea></div>
+        <div class="field"><label for="n-note">補足・備考</label><textarea id="n-note" style="min-height:60px"></textarea></div>
+      </div>
+
+      <!-- 採決結果 -->
+      <div class="panel" id="panel-vote" hidden>
+        <h2>採決結果バナー</h2>
+        <div class="field"><label for="v-committee">委員会名</label><input type="text" id="v-committee" value="代表委員会"></div>
+        <div class="chips" role="radiogroup" aria-label="委員会の色テーマ">
+          <label><input type="radio" name="v-theme" value="green"><span class="dot" style="background:#157f3d"></span>全校（緑）</label>
+          <label><input type="radio" name="v-theme" value="blue" checked><span class="dot" style="background:#0b62c5"></span>代表（青）</label>
+          <label><input type="radio" name="v-theme" value="red"><span class="dot" style="background:#c92a2a"></span>行事（赤）</label>
+        </div>
+        <div class="field" style="margin-top:14px"><label for="v-title">タイトル</label><input type="text" id="v-title" value="議案の採決結果"></div>
+        <div class="grid2">
+          <div class="field"><label for="v-date">開催日</label><input type="text" id="v-date" value="10月20日（火）"></div>
+          <div class="field"><label for="v-meet">会議名・備考</label><input type="text" id="v-meet" value="第3回 代表委員会"></div>
+        </div>
+        <h3>議案</h3>
+        <div id="agendaList"></div>
+        <button type="button" class="btn ghost block" id="addAgenda">＋ 議案を追加</button>
+        <div class="field" style="margin-top:14px"><label for="v-summary">全体のまとめ（任意）</label><textarea id="v-summary" style="min-height:60px"></textarea></div>
+      </div>
+
+      <!-- 行事検討 -->
+      <div class="panel" id="panel-event" hidden>
+        <h2>行事検討委員会バナー</h2>
+        <div class="seg tabs" role="group" aria-label="予告・報告の切替" style="margin-bottom:16px">
+          <button type="button" data-emode="notice" aria-pressed="true">予告</button>
+          <button type="button" data-emode="report" aria-pressed="false">報告</button>
+        </div>
+        <div class="field"><label for="e-committee">委員会名</label><input type="text" id="e-committee" value="行事検討委員会"></div>
+        <div id="e-notice-fields">
+          <div class="grid2">
+            <div class="field"><label for="e-date">開催日</label><input type="text" id="e-date" value="10月22日（木）"></div>
+            <div class="field"><label for="e-time">時刻</label><input type="text" id="e-time" value="16:30"></div>
+          </div>
+          <div class="field"><label for="e-place">場所</label><input type="text" id="e-place" value="会議室A"></div>
+          <div class="field"><label for="e-agenda">議題</label><textarea id="e-agenda">・文化祭テーマの最終確認</textarea></div>
+          <div class="field"><label for="e-note">備考</label><textarea id="e-note" style="min-height:60px"></textarea></div>
+        </div>
+        <div id="e-report-fields" hidden>
+          <div class="grid2">
+            <div class="field"><label for="e-kai">開催回</label><input type="text" id="e-kai" value="第4回"></div>
+            <div class="field"><label for="e-rdate">開催日</label><input type="text" id="e-rdate" value="10月22日（木）"></div>
+          </div>
+          <div class="field"><label for="e-ragenda">議題</label><input type="text" id="e-ragenda" value="文化祭テーマの最終確認"></div>
+          <div class="field"><label for="e-summary">要旨（2〜3行）</label><textarea id="e-summary" style="min-height:70px">テーマ案3件を審議し、「響宴」に決定。当日のタイムテーブルについても概ね了承された。</textarea></div>
+          <div class="field"><label for="e-url">議事要旨PDFのURL</label><input type="url" id="e-url" placeholder="https://…">
+            <div class="hint"><b>https://</b> または <b>http://</b> で始まるURLのみ有効です。画像内は文字列として表示され、リンクは開けません。</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>出力</h2>
+        <div class="field"><label>保存形式（比率・固定寸法）</label>
+          <div class="ratio" role="group" aria-label="出力比率">
+            <button type="button" data-ratio="16:9" aria-pressed="true">横長 16:9</button>
+            <button type="button" data-ratio="1:1" aria-pressed="false">正方形 1:1</button>
+            <button type="button" data-ratio="9:16" aria-pressed="false">縦長 9:16</button>
+          </div>
+          <div class="hint">PNG出力サイズ：16:9＝2560×1440 px、1:1＝1800×1800 px、9:16＝1080×1920 px（内部キャンバスを2倍で出力）</div>
+        </div>
+        <button type="button" class="btn primary block" id="exportBtn">PNGを生成する</button>
+        <div class="status" id="saveStatus" role="status" aria-live="polite"></div>
+        <div class="note" id="ipadHelp"><b>iPadでの保存：</b>生成後に画像が表示されます。「ダウンロード」でファイルに保存するか、対応環境では「共有」から共有シートを開けます。Safariのメニューから「画像を保存」を選ぶ、画像を長押しする方法も使えます。ブラウザーとバージョン、共有メニューの設定によって保存方法は異なります。</div>
+      </div>
+    </section>
+
+    <section aria-label="バナープレビュー">
+      <div class="stage-wrap" id="stageWrap" data-ratio="16:9">
+        <div class="banner r169" id="bannerStage" role="img" aria-label="バナープレビュー"></div>
+      </div>
+      <div class="note" style="margin-top:14px">プレビューは実際のPNGと同じ比率・レイアウトです。Teams投稿やスマートフォン表示を想定して3種類の比率から選べます。</div>
+    </section>
+  </div>
+</main>
+<footer>本アプリはデジタル庁デザインシステム（DADS）とApple Human Interface Guidelinesの考え方（明瞭さ・階層・余白・可読性）を参考にした独自デザインです。公式の部品・認証・模写ではありません。入力データはこのブラウザー内にのみ保存されます。</footer>
+
+<div id="exportStage" aria-hidden="true"></div>
+
+<div class="modal" id="imgModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal-card">
+    <h2 id="modalTitle">生成された画像</h2>
+    <p style="margin:0 0 10px;color:#6e6e73;font-size:14px">内容を確認してから保存してください。</p>
+    <img id="modalImg" alt="生成されたバナー画像">
+    <div class="modal-actions">
+      <button type="button" class="btn primary" id="dlBtn">ダウンロード（ファイルに保存）</button>
+      <button type="button" class="btn ghost" id="shareBtn" hidden>共有…</button>
+      <button type="button" class="btn ghost" id="closeModal">閉じる</button>
+    </div>
+    <p style="font-size:13px;color:#6e6e73;line-height:1.7;margin:12px 0 0">iPadでは：「共有」から共有シートを開く／「ダウンロード」後にファイルAppで確認／画像を長押しして「写真に保存」（環境により非対応の場合あり）。表示はブラウザー・バージョン・設定によって異なります。</p>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var LS_KEY="scouncil-app-v1";
+var THEMES={
+  green:{main:"#157f3d",soft:"#eaf6ee",deep:"#0d5c2c"},
+  blue:{main:"#0b62c5",soft:"#e8f1fc",deep:"#084e9e"},
+  red:{main:"#c92a2a",soft:"#fdecec",deep:"#a11f1f"}
+};
+var RATIOS={"16:9":{cls:"r169",w:1280,h:720,sx:2},"1:1":{cls:"r11",w:900,h:900,sx:2},"9:16":{cls:"r916",w:540,h:960,sx:2}};
+var RESULTS={pass:"可決",rej:"否決",cont:"継続審議"};
+var RESULT_CLS={pass:"badge-pass",rej:"badge-rej",cont:"badge-cont"};
+
+var defaults={
+  tab:"notice",ratio:"16:9",emode:"notice",
+  notice:{committee:"全校委員会",theme:"green",title:"第1回 全校委員会",date:"10月15日（木）",time:"16:00",place:"視聴覚室",agenda:"・学生会館利用について\n・文化祭の準備状況",note:""},
+  vote:{committee:"代表委員会",theme:"blue",title:"議案の採決結果",date:"10月20日（火）",meet:"第3回 代表委員会",summary:"",
+    agendas:[
+      {name:"学生会館 夜間利用の拡大",abstain:0,hold:1,yes:18,no:2,result:"pass"},
+      {name:"来年度 生徒会費の使途案",abstain:1,hold:0,yes:15,no:5,result:"pass"},
+      {name:"制服規定の見直し",abstain:2,hold:3,yes:8,no:10,result:"cont"}
+    ]},
+  event:{committee:"行事検討委員会",mode:"notice",
+    n:{date:"10月22日（木）",time:"16:30",place:"会議室A",agenda:"・文化祭テーマの最終確認",note:""},
+    r:{kai:"第4回",date:"10月22日（木）",agenda:"文化祭テーマの最終確認",summary:"テーマ案3件を審議し、「響宴」に決定。当日のタイムテーブルについても概ね了承された。",url:""}}
+};
+var state=null;
+try{var raw=localStorage.getItem(LS_KEY);state=raw?JSON.parse(raw):JSON.parse(JSON.stringify(defaults));}catch(e){state=JSON.parse(JSON.stringify(defaults));}
+if(!state||!state.notice||!state.vote||!state.event){state=JSON.parse(JSON.stringify(defaults));}
+if(!Array.isArray(state.vote.agendas)||state.vote.agendas.length===0){state.vote.agendas=JSON.parse(JSON.stringify(defaults.vote.agendas));}
+state.vote.agendas=state.vote.agendas.slice(0,10);
+
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function save(){
+  try{localStorage.setItem(LS_KEY,JSON.stringify(state));$("saveStatus").textContent="保存済み "+new Date().toLocaleTimeString("ja-JP");}
+  catch(e){$("saveStatus").textContent="保存できませんでした（ブラウザーの保存領域が無効・満杯の可能性）。この画面の間は編集を続けられます。";}
+}
+
+/* ---- 日付分解：「10月15日（木）」「2026/10/15」等を想定 ---- */
+function parseDate(s){
+  s=String(s||"").trim();if(!s)return null;
+  var m=s.match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+  if(m)return{y:m[1],mo:+m[2],d:+m[3]};
+  m=s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+  if(m)return{y:null,mo:+m[1],d:+m[2]};
+  m=s.match(/(\d{1,2})\s*[\/\-.]\s*(\d{1,2})/);
+  if(m)return{y:null,mo:+m[1],d:+m[2]};
+  return null;
+}
+function weekdayOf(s){var m=String(s||"").match(/[（(]\s*(日|月|火|水|木|金|土)\s*[)）]/);return m?m[1]:null;}
+var WD=["日","月","火","水","木","金","土"];
+function autoWeekday(y,mo,d){
+  if(!y)return null;
+  var w=new Date(+y,+mo-1,+d).getDay();return isNaN(w)?null:WD[w];
+}
+function fmtNum(n){return (n<10?"0":"")+n;}
+
+/* ---- アイコン（インラインSVG） ---- */
+var ICONS={
+  pin:'<svg class="b-icon" viewBox="0 0 24 24" fill="none" stroke="#6e6e73" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>',
+  clock:'<svg class="b-icon" viewBox="0 0 24 24" fill="none" stroke="#6e6e73" stroke-width="2.2" stroke-linecap="round" width="22" height="22"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>',
+  doc:'<svg class="b-icon" viewBox="0 0 24 24" fill="none" stroke="#6e6e73" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>',
+  note:'<svg class="b-icon" viewBox="0 0 24 24" fill="none" stroke="#6e6e73" stroke-width="2.2" stroke-linecap="round" width="22" height="22"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>',
+  link:'<svg class="b-icon" viewBox="0 0 24 24" fill="none" stroke="#0b62c5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
+  cal:'<svg class="b-icon" viewBox="0 0 24 24" fill="none" stroke="#6e6e73" stroke-width="2.2" stroke-linecap="round" width="22" height="22"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>'
+};
+function ic(name){return ICONS[name]||"";}
+
+function pill(theme,name){
+  var t=THEMES[theme]||THEMES.green;
+  return '<span class="b-pill" style="background:'+t.soft+';color:'+t.deep+';border:1.5px solid '+t.main+'"><span class="dot" style="background:'+t.main+'"></span>'+esc(name)+'</span>';
+}
+function dateBlock(rclass,dateStr,timeStr){
+  var p=parseDate(dateStr),wd=weekdayOf(dateStr)||(p?autoWeekday(p.y,p.mo,p.d):null);
+  if(!p){
+    return '<div class="b-date"><span class="b-wd" style="font-size:inherit"></span><div class="b-big" style="font-size:44px">'+esc(dateStr||"日付未設定")+'</div>'+(timeStr?'<div class="b-time">'+ic("clock")+' '+esc(timeStr)+'</div>':"")+'</div>';
+  }
+  var mon=p.y?p.y+"年"+p.mo+"月":p.mo+"月";
+  var wdHtml=wd?'<span class="b-wd">（'+wd+'）</span>':"";
+  return '<div class="b-date"><div class="b-mon">'+esc(mon)+'</div><div class="b-big">'+p.d+'</div>'+wdHtml+(timeStr?'<div class="b-time">'+ic("clock")+" "+esc(timeStr)+"</div>":"")+"</div>";
+}
+
+/* ============ バナーレンダリング ============ */
+function renderNotice(){
+  var d=state.notice,r=RATIOS[state.ratio];
+  var h='<div class="b-top">'+pill(d.theme,d.committee)+'<span class="b-title">'+esc(d.title)+"</span></div>";
+  h+='<div class="b-body">'+dateBlock(r.cls,d.date,d.time);
+  h+='<div class="b-main">';
+  h+='<div class="b-card"><div class="b-label">'+ic("pin")+" 場所</div>"+'<div class="b-place">'+esc(d.place||"—")+"</div></div>";
+  h+='<div class="b-card"><div class="b-label">'+ic("doc")+" 議題</div>"+'<div class="b-agenda">'+esc(d.agenda||"（議題未設定）").replace(/\n+$/,"")+"</div></div>";
+  if(d.note&&d.note.trim())h+='<div class="b-card"><div class="b-label">'+ic("note")+" 備考</div>"+'<div class="b-note">'+esc(d.note)+"</div></div>";
+  h+="</div></div>";
+  return h;
+}
+function renderVote(){
+  var d=state.vote,r=RATIOS[state.ratio];
+  var p=parseDate(d.date),wd=weekdayOf(d.date)||(p?autoWeekday(p.y,p.mo,p.d):null);
+  var dateTxt=p?p.mo+"月"+p.d+"日"+(wd?"（"+wd+"）":""):d.date;
+  var n=d.agendas.length;
+  var densCls=n>=6?"xdense":(n>=4?"dense":"");
+  var h='<div class="b-top">'+pill(d.theme,d.committee);
+  h+='<div class="b-titleblock"><div class="b-title">'+esc(d.title)+'</div><div class="b-meet">'+esc(d.meet)+'</div></div>';
+  h+='<div class="b-datebox"><span class="b-big">'+esc(dateTxt||"—")+'</span></div></div>';
+  h+='<div class="b-grid">';
+  d.agendas.forEach(function(a){
+    h+='<div class="b-vcard '+densCls+'"><div class="b-vname">'+esc(a.name||"（議案未設定）")+'</div>';
+    h+='<div class="b-votes">';
+    [["棄権",a.abstain],["保留",a.hold],["賛成",a.yes],["反対",a.no]].forEach(function(v){
+      h+='<div class="v"><span class="vl">'+v[0]+'</span><span class="vn">'+esc(v[1])+"</span></div>";
+    });
+    h+='</div><span class="b-badge '+RESULT_CLS[a.result]+'">'+RESULTS[a.result]+"</span></div>";
+  });
+  h+="</div>";
+  if(d.summary&&d.summary.trim())h+='<div class="b-summary">'+esc(d.summary)+"</div>";
+  return h;
+}
+function safeUrl(u){
+  u=String(u||"").trim();
+  return /^https?:\/\//i.test(u)?u:"";
+}
+function renderEvent(){
+  var d=state.event,r=RATIOS[state.ratio];
+  var mode=d.mode==="report"?"報告":"予告";
+  var h='<div class="b-top">'+pill("red",d.committee)+'<span class="b-title">行事検討委員会</span><span class="b-mode">'+mode+"</span></div>";
+  if(d.mode==="notice"){
+    h+='<div class="b-body">'+dateBlock(r.cls,d.n.date,d.n.time);
+    h+='<div class="b-main">';
+    h+='<div class="b-card"><div class="b-label">'+ic("pin")+" 場所</div>"+'<div class="b-place">'+esc(d.n.place||"—")+"</div></div>";
+    h+='<div class="b-card"><div class="b-label">'+ic("doc")+" 議題</div>"+'<div class="b-agenda">'+esc(d.n.agenda||"（議題未設定）")+"</div></div>";
+    if(d.n.note&&d.n.note.trim())h+='<div class="b-card"><div class="b-label">'+ic("note")+" 備考</div>"+'<div class="b-note">'+esc(d.n.note)+"</div></div>";
+    h+="</div></div>";
+  }else{
+    var p=parseDate(d.r.date),wd=weekdayOf(d.r.date)||(p?autoWeekday(p.y,p.mo,p.d):null);
+    var dateTxt=p?p.mo+"月"+p.d+"日"+(wd?"（"+wd+"）":""):d.r.date;
+    h+='<div class="b-date"><div class="b-kai">'+esc(d.r.kai||"")+'　<span style="font-size:.55em;color:#6e6e73;font-weight:700">'+ic("cal")+" "+esc(dateTxt||"—")+"</span></div></div>";
+    h+='<div class="b-card"><div class="b-label">'+ic("doc")+" 議題</div>"+'<div class="b-agenda">'+esc(d.r.agenda||"—")+"</div></div>";
+    h+='<div class="b-card"><div class="b-label">要旨</div><div class="b-note">'+esc(d.r.summary||"—")+"</div></div>";
+    var u=safeUrl(d.r.url);
+    h+='<div class="b-card"><div class="b-label">'+ic("link")+' 議事要旨PDF（画像内はリンクを開けません）</div><div class="b-urlbox">'+esc(u||"（URL未設定）")+"</div></div>";
+  }
+  return h;
+}
+function render(){
+  var stage=$("bannerStage"),r=RATIOS[state.ratio];
+  stage.className="banner "+r.cls+" "+({"notice":"notice","vote":"vote","event":"event"})[state.tab]+r.cls.slice(1);
+  if(state.tab==="notice")stage.innerHTML=renderNotice();
+  else if(state.tab==="vote")stage.innerHTML=renderVote();
+  else stage.innerHTML=renderEvent();
+  fitStage();
+}
+function fitStage(){
+  var wrap=$("stageWrap"),stage=$("bannerStage"),r=RATIOS[state.ratio];
+  var maxW=Math.max(0,wrap.parentElement.clientWidth);
+  var availH=Math.max(0,window.innerHeight*0.82);
+  var s=Math.min(maxW/r.w,availH/r.h);
+  if(!isFinite(s)||s<=0)s=0.01;
+  stage.style.transform="scale("+s+")";
+  wrap.style.width=(r.w*s)+"px";
+  wrap.style.height=(r.h*s)+"px";
+}
+
+/* ============ フォーム同期 ============ */
+function bind(id,fn){var el=$(id);if(el)el.addEventListener("input",fn);return el;}
+function syncFromState(){
+  $("n-committee").value=state.notice.committee;$("n-title").value=state.notice.title;
+  $("n-date").value=state.notice.date;$("n-time").value=state.notice.time;
+  $("n-place").value=state.notice.place;$("n-agenda").value=state.notice.agenda;$("n-note").value=state.notice.note;
+  document.querySelector('input[name="n-theme"][value="'+state.notice.theme+'"]').checked=true;
+  $("v-committee").value=state.vote.committee;$("v-title").value=state.vote.title;
+  $("v-date").value=state.vote.date;$("v-meet").value=state.vote.meet;$("v-summary").value=state.vote.summary;
+  document.querySelector('input[name="v-theme"][value="'+state.vote.theme+'"]').checked=true;
+  $("e-committee").value=state.event.committee;
+  $("e-date").value=state.event.n.date;$("e-time").value=state.event.n.time;$("e-place").value=state.event.n.place;
+  $("e-agenda").value=state.event.n.agenda;$("e-note").value=state.event.n.note;
+  $("e-kai").value=state.event.r.kai;$("e-rdate").value=state.event.r.date;$("e-ragenda").value=state.event.r.agenda;
+  $("e-summary").value=state.event.r.summary;$("e-url").value=state.event.r.url;
+  buildAgendaRows();setTab(state.tab,false);setEmode(state.event.mode,false);setRatio(state.ratio,false);
+}
+function buildAgendaRows(){
+  var box=$("agendaList");box.innerHTML="";
+  state.vote.agendas.forEach(function(a,i){
+    var row=document.createElement("div");row.className="agenda-row";
+    row.innerHTML='<div class="top"><strong>議案 '+(i+1)+'</strong>'+(state.vote.agendas.length>1?'<button type="button" class="icon-btn" data-del="'+i+'" aria-label="議案'+(i+1)+'を削除">✕</button>':"")+"</div>"+
+      '<div class="field"><label>議案名</label><input type="text" data-i="'+i+'" data-f="name" value="'+esc(a.name)+'"></div>'+
+      '<div class="grid3">'+
+      ["abstain|棄権","hold|保留","yes|賛成","no|反対"].map(function(kv){var k=kv.split("|");
+        return '<div class="field" style="margin-bottom:8px"><label>'+k[1]+'</label><input type="number" min="0" max="99999" inputmode="numeric" data-i="'+i+'" data-f="'+k[0]+'" value="'+esc(a[k[0]])+'"></div>';
+      }).join("")+
+      '<div class="field" style="margin-bottom:8px"><label>結果</label><select data-i="'+i+'" data-f="result">'+
+      Object.keys(RESULTS).map(function(k){return '<option value="'+k+'"'+(a.result===k?" selected":"")+">"+RESULTS[k]+"</option>";}).join("")+
+      "</select></div></div>";
+    box.appendChild(row);
+  });
+  box.querySelectorAll("input,select").forEach(function(el){
+    el.addEventListener("input",function(){
+      var i=+el.dataset.i,f=el.dataset.f;
+      state.vote.agendas[i][f]=f==="name"||f==="result"?el.value:(parseInt(el.value,10)||0);
+      save();render();
+    });
+  });
+  box.querySelectorAll("[data-del]").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      state.vote.agendas.splice(+btn.dataset.del,1);save();buildAgendaRows();render();
+    });
+  });
+}
+$("addAgenda").addEventListener("click",function(){
+  if(state.vote.agendas.length>=7){alert("議案は7件まで表示を想定しています。");}
+  state.vote.agendas.push({name:"",abstain:0,hold:0,yes:0,no:0,result:"cont"});
+  save();buildAgendaRows();render();
+});
+
+bind("n-committee",function(e){state.notice.committee=e.target.value;save();render();});
+bind("n-title",function(e){state.notice.title=e.target.value;save();render();});
+bind("n-date",function(e){state.notice.date=e.target.value;save();render();});
+bind("n-time",function(e){state.notice.time=e.target.value;save();render();});
+bind("n-place",function(e){state.notice.place=e.target.value;save();render();});
+bind("n-agenda",function(e){state.notice.agenda=e.target.value;save();render();});
+bind("n-note",function(e){state.notice.note=e.target.value;save();render();});
+bind("v-committee",function(e){state.vote.committee=e.target.value;save();render();});
+bind("v-title",function(e){state.vote.title=e.target.value;save();render();});
+bind("v-date",function(e){state.vote.date=e.target.value;save();render();});
+bind("v-meet",function(e){state.vote.meet=e.target.value;save();render();});
+bind("v-summary",function(e){state.vote.summary=e.target.value;save();render();});
+bind("e-committee",function(e){state.event.committee=e.target.value;save();render();});
+bind("e-date",function(e){state.event.n.date=e.target.value;save();render();});
+bind("e-time",function(e){state.event.n.time=e.target.value;save();render();});
+bind("e-place",function(e){state.event.n.place=e.target.value;save();render();});
+bind("e-agenda",function(e){state.event.n.agenda=e.target.value;save();render();});
+bind("e-note",function(e){state.event.n.note=e.target.value;save();render();});
+bind("e-kai",function(e){state.event.r.kai=e.target.value;save();render();});
+bind("e-rdate",function(e){state.event.r.date=e.target.value;save();render();});
+bind("e-ragenda",function(e){state.event.r.agenda=e.target.value;save();render();});
+bind("e-summary",function(e){state.event.r.summary=e.target.value;save();render();});
+bind("e-url",function(e){
+  var v=e.target.value.trim();
+  if(v&&!safeUrl(v)){$("saveStatus").textContent="URLはhttps://またはhttp://で始めてください（他のスキームはリンクとして開きません）。";}
+  state.event.r.url=v;save();render();
+});
+document.querySelectorAll('input[name="n-theme"]').forEach(function(r){r.addEventListener("change",function(){state.notice.theme=r.value;save();render();});});
+document.querySelectorAll('input[name="v-theme"]').forEach(function(r){r.addEventListener("change",function(){state.vote.theme=r.value;save();render();});});
+
+function setTab(t,saveIt){
+  state.tab=t;
+  document.querySelectorAll('[data-tab]').forEach(function(b){b.setAttribute("aria-pressed",b.dataset.tab===t?"true":"false");});
+  ["notice","vote","event"].forEach(function(k){$("panel-"+k).hidden=k!==t;});
+  if(saveIt!==false)save();
+  render();
+}
+document.querySelectorAll('[data-tab]').forEach(function(b){b.addEventListener("click",function(){setTab(b.dataset.tab);});});
+
+function setEmode(m,saveIt){
+  state.event.mode=m;
+  document.querySelectorAll('[data-emode]').forEach(function(b){b.setAttribute("aria-pressed",b.dataset.emode===m?"true":"false");});
+  $("e-notice-fields").hidden=m!=="notice";
+  $("e-report-fields").hidden=m!=="report";
+  if(saveIt!==false)save();
+  render();
+}
+document.querySelectorAll('[data-emode]').forEach(function(b){b.addEventListener("click",function(){setEmode(b.dataset.emode);});});
+
+function setRatio(rr,saveIt){
+  state.ratio=rr;
+  document.querySelectorAll('[data-ratio]').forEach(function(b){b.setAttribute("aria-pressed",b.dataset.ratio===rr?"true":"false");});
+  $("stageWrap").dataset.ratio=rr;
+  if(saveIt!==false)save();
+  render();
+}
+document.querySelectorAll('[data-ratio]').forEach(function(b){b.addEventListener("click",function(){setRatio(b.dataset.ratio);});});
+
+/* ============ PNG出力 ============ */
+var lastBlob=null,lastName="banner.png";
+function exportName(){
+  var base={"notice":"告知","vote":"採決","event":"行事"}[state.tab];
+  var d=(state.tab==="event")?(state.event.mode==="report"?state.event.r.date:state.event.n.date):(state.tab==="vote"?state.vote.date:state.notice.date);
+  var p=parseDate(d);
+  return base+(p?"_"+(p.y?p.y+"-":"")+fmtNum(p.mo)+"-"+fmtNum(p.d):"")+".png";
+}
+$("exportBtn").addEventListener("click",function(){
+  var btn=$("exportBtn");
+  if(typeof html2canvas==="undefined"){
+    $("cdnWarn").style.display="block";
+    $("cdnWarn").scrollIntoView({behavior:"smooth"});
+    return;
+  }
+  btn.disabled=true;btn.textContent="生成中…";
+  var stage=$("bannerStage"),r=RATIOS[state.ratio];
+  var ex=$("exportStage");ex.innerHTML="";
+  var clone=stage.cloneNode(true);
+  clone.removeAttribute("style");
+  clone.className=stage.className;
+  ex.appendChild(clone);
+  html2canvas(clone,{scale:r.sx,backgroundColor:"#ffffff",useCORS:true,logging:false,width:r.w,height:r.h,windowWidth:r.w+80,windowHeight:r.h+80})
+    .then(function(canvas){
+      canvas.toBlob(function(blob){
+        ex.innerHTML="";
+        if(!blob){alert("画像データの生成に失敗しました。内容を減らすか、別の比率をお試しください。");btn.disabled=false;btn.textContent="PNGを生成する";return;}
+        lastBlob=blob;lastName=exportName();
+        var url=URL.createObjectURL(blob);
+        var img=$("modalImg");img.src=url;
+        $("modalImg").onload=function(){URL.revokeObjectURL(url);};
+        var shareBtn=$("shareBtn");
+        var file=new File([blob],lastName,{type:"image/png"});
+        if(navigator.canShare&&navigator.canShare({files:[file]})){shareBtn.hidden=false;}
+        else{shareBtn.hidden=true;}
+        $("imgModal").classList.add("open");
+        btn.disabled=false;btn.textContent="PNGを生成する";
+      },"image/png");
+    })
+    .catch(function(err){
+      ex.innerHTML="";
+      console.error(err);
+      alert("PNG生成中にエラーが発生しました："+(err&&err.message?err.message:"不明なエラー")+"\n・ページを再読み込みする\n・長い文章を減らす\n・別のブラウザーを試す\nなどをお試しください。");
+      btn.disabled=false;btn.textContent="PNGを生成する";
+    });
+});
+$("dlBtn").addEventListener("click",function(){
+  if(!lastBlob)return;
+  var url=URL.createObjectURL(lastBlob);
+  var a=document.createElement("a");
+  a.href=url;a.download=lastName;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},4000);
+});
+$("shareBtn").addEventListener("click",function(){
+  if(!lastBlob)return;
+  var file=new File([lastBlob],lastName,{type:"image/png"});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    navigator.share({files:[file],title:"生徒会バナー"}).catch(function(e){if(e&&e.name!=="AbortError")alert("共有に失敗しました："+e.message);});
+  }else{
+    alert("この環境では共有シートを利用できません。「ダウンロード」をご利用ください。");
+  }
+});
+$("closeModal").addEventListener("click",function(){$("imgModal").classList.remove("open");});
+$("imgModal").addEventListener("click",function(e){if(e.target===$("imgModal"))$("imgModal").classList.remove("open");});
+document.addEventListener("keydown",function(e){if(e.key==="Escape")$("imgModal").classList.remove("open");});
+
+/* html2canvas未読み込み検知（defer読み込み後に確認） */
+window.addEventListener("resize",fitStage);
+if(window.ResizeObserver){
+  var previewObserver=new ResizeObserver(fitStage);
+  previewObserver.observe($("stageWrap").parentElement);
+}
+
+syncFromState();render();
+})();
+</script>
+</body>
+</html>
